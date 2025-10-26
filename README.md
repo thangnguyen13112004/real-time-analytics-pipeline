@@ -6,9 +6,10 @@ Kafka for data ingestion, and visualizes insights on a Kibana dashboard.
 
 
 📸 Demo - Visuals
-![alt text](image.png)
 
-![alt text](image-1.png)
+![alt text](Assets/image.png)
+
+![alt text](Assets/image-1.png)
 
 Video demo: https://drive.google.com/file/d/1dlEM5IrWJZnC5bRWZtJZuJOdkfGwkuOO/view
 
@@ -39,17 +40,17 @@ Follow these steps to run the project locally:
 docker compose up -d
 
 This will start Kafka, ZooKeeper, Elasticsearch, PostgreSQL and Kibana containers.
-![alt text](image-2.png)
+![alt text](Assets/image-2.png)
 
 3. Run index.html and bigdata.py
 
 This script connects to Kafka and initializes user event data streams.
-![alt text](image-3.png)
+![alt text](Assets/image-3.png)
 
 4. Start the Flink job
 
 Upload and run the compiled JAR file for the Flink job (e.g., flink_job.jar).
-![alt text](image-4.png)
+![alt text](Assets/image-4.png)
 
 5. Launch Kibana Dashboard
 
