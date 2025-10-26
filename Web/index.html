@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Realtime Product Transactions</title>
+  <script>
+    const apiUrl = "http://localhost:5000/transaction";
+
+    // Hàm random dữ liệu theo kiểu generate_sales_transactions()
+    function generateSalesTransaction(productId, productName, productBrand) {
+      const categories = ['electronic', 'fashion', 'grocery', 'home', 'beauty', 'sports'];
+      const currencies = ['USD', 'GBP'];
+      const paymentMethods = ['credit_card', 'debit_card', 'online_transfer'];
+      const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+      const randomCurrency = currencies[Math.floor(Math.random() * currencies.length)];
+      const randomPayment = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
+      const price = (Math.random() * (1000 - 10) + 10).toFixed(2);
+      const quantity = Math.floor(Math.random() * 10) + 1;
+
+      const transaction = {
+        transactionId: crypto.randomUUID(),
+        productId,
+        productName,
+        productCategory: randomCategory,
+        productPrice: parseFloat(price),
+        productQuantity: quantity,
+        productBrand,
+        totalAmount: parseFloat(price) * quantity,
+        currency: randomCurrency,
+        customerId: "user_" + Math.floor(Math.random() * 10000),
+        transactionDate: new Date().toISOString(),
+        paymentMethod: randomPayment
+      };
+      return transaction;
+    }
+
+    // Gửi dữ liệu tới Flask API
+    async function sendTransaction(productId, productName, productBrand) {
+      const data = generateSalesTransaction(productId, productName, productBrand);
+
+      try {
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          alert(`✅ Đã gửi giao dịch cho ${productName} (${productBrand})`);
+          console.log("Transaction:", data);
+        } else {
+          alert("❌ Gửi thất bại!");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("❌ Không thể kết nối API!");
+      }
+    }
+
+    // Khi tải trang, hiển thị danh sách sản phẩm random
+    function renderProducts() {
+      const products = [
+        { id: 'product1', name: 'Laptop' },
+        { id: 'product2', name: 'Mobile' },
+        { id: 'product3', name: 'Tablet' },
+        { id: 'product4', name: 'Watch' },
+        { id: 'product5', name: 'Headphone' },
+        { id: 'product6', name: 'Speaker' }
+      ];
+      const brands = ['Apple', 'Samsung', 'OnePlus', 'Mi', 'Boat', 'Sony'];
+      const currencies = ['USD', 'GBP'];
+      const paymentMethods = ['credit_card', 'debit_card', 'online_transfer'];
+
+      const container = document.getElementById("product-list");
+      container.innerHTML = "";
+
+      products.forEach(p => {
+        const brand = brands[Math.floor(Math.random() * brands.length)];
+        const price = (Math.random() * (1000 - 10) + 10).toFixed(2);
+        const currency = currencies[Math.floor(Math.random() * currencies.length)];
+        const payment = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
+
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <h3>${p.name}</h3>
+          <p><strong>Hãng:</strong> ${brand}</p>
+          <p><strong>Giá:</strong> ${price} ${currency}</p>
+          <p><strong>Thanh toán:</strong> ${payment}</p>
+          <button onclick="sendTransaction('${p.id}', '${p.name}', '${brand}')">Mua ngay</button>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    window.onload = renderProducts;
+  </script>
+
+  <style>
+    body { font-family: sans-serif; background: #f5f5f5; }
+    h1 { text-align: center; color: #0078d4; }
+    #product-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    button {
+      background: #0078d4;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #005fa3;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🛍️ Hệ thống giao dịch thời gian thực</h1>
+  <div id="product-list"></div>
+</body>
+</html>
