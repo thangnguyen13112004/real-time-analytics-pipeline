@@ -5,6 +5,7 @@ import Dto.SalesPerCategory;
 import Dto.SalesPerDay;
 import Dto.SalesPerMonth;
 import Dto.Transaction;
+import org.apache.flink.api.common.eventtime.SerializableTimestampAssigner;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.time.Time;
@@ -21,9 +22,22 @@ import org.apache.flink.elasticsearch7.shaded.org.elasticsearch.common.xcontent.
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.connector.jdbc.JdbcSink;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.types.Row;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+import org.apache.flink.api.common.eventtime.WatermarkStrategy; // <-- Nhớ import
+import java.time.Duration; // <-- Nhớ import
+
 
 import java.sql.Date;
+import java.time.Duration;
 
+import static org.apache.flink.table.api.Expressions.$;
 import static utils.JsonUtil.convertTransactionToJson;
 
 public class DataStreamJob {
@@ -33,6 +47,8 @@ public class DataStreamJob {
 
 	public static void main(String[] args) throws Exception {
 		final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        final StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env);
+
 
         String topic = "financial_transactions";
 
@@ -44,9 +60,128 @@ public class DataStreamJob {
                 .setValueOnlyDeserializer(new JSONValueDeserializationSchema())
                 .build();
 
-        DataStream<Transaction> transactionStream = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka source");
+        // CODE MỚI (Sửa lỗi)
+        DataStream<Transaction> transactionStream = env.fromSource(source,
+                // Chỉ định Flink dùng Event Time
+                WatermarkStrategy
+                        .<Transaction>forBoundedOutOfOrderness(Duration.ofSeconds(5)) // Chấp nhận trễ 10 giây
+                        .withTimestampAssigner((transaction, previousTimestamp) -> {
+                            // Chỉ Flink cách lấy Event Time từ DTO
+                            return transaction.getTransactionDate().getTime();
+                        }),
+                "Kafka source");
 
-        transactionStream.print();
+        //DataStream<Transaction> transactionStream = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka source");
+
+        // CODE MỚI (Sửa lỗi - Dùng cách tường minh)
+        tableEnv.createTemporaryView("transactions", transactionStream,
+                $("transactionId"),
+                $("customerId"),
+                $("customerCountry"),
+                $("totalAmount"),
+                $("transactionDate"), // <-- Giữ transactionDate làm cột dữ liệu bình thường
+                $("transactionDate").rowtime().as("event_time") // <-- Tạo thuộc tính rowtime tên là "event_time"
+        );
+
+
+        // -------- BẮT ĐẦU CÁC LUỒNG XỬ LÝ (PIPELINE) --------
+
+        // ========================================
+        // PIPELINE 1: FRAUD DETECTION (TỐI ƯU NHẤT)
+        // Dùng ValueState để lưu giao dịch gần nhất của mỗi customer
+        // ========================================
+
+        transactionStream
+                .keyBy(Transaction::getCustomerId)
+                .process(new org.apache.flink.streaming.api.functions.KeyedProcessFunction<String, Transaction, String>() {
+
+                    // Lưu giao dịch gần nhất
+                    private transient org.apache.flink.api.common.state.ValueState<Transaction> lastTransactionState;
+
+                    @Override
+                    public void open(org.apache.flink.configuration.Configuration parameters) {
+                        org.apache.flink.api.common.state.ValueStateDescriptor<Transaction> descriptor =
+                                new org.apache.flink.api.common.state.ValueStateDescriptor<>(
+                                        "lastTransaction",
+                                        org.apache.flink.api.common.typeinfo.TypeInformation.of(Transaction.class)
+                                );
+                        lastTransactionState = getRuntimeContext().getState(descriptor);
+                    }
+
+                    @Override
+                    public void processElement(Transaction current, Context ctx, org.apache.flink.util.Collector<String> out) throws Exception {
+                        Transaction last = lastTransactionState.value();
+
+                        // Nếu có giao dịch trước đó
+                        if (last != null) {
+                            String lastCountry = last.getCustomerCountry();
+                            String currentCountry = current.getCustomerCountry();
+
+                            // Kiểm tra quốc gia khác nhau
+                            if (lastCountry != null && currentCountry != null && !lastCountry.equals(currentCountry)) {
+
+                                long timeDiff = current.getTransactionDate().getTime() - last.getTransactionDate().getTime();
+                                long minutesDiff = timeDiff / (1000 * 60);
+
+                                // Nếu trong vòng 5 phút
+                                if (timeDiff > 0 && minutesDiff <= 5) {
+                                    String alert = String.format(
+                                            "\n" +
+                                                    "╔════════════════════════════════════════════════════════════════╗\n" +
+                                                    "║          🚨 CẢNH BÁO GIAO DỊCH KHẢ NGHI 🚨                     ║\n" +
+                                                    "╠════════════════════════════════════════════════════════════════╣\n" +
+                                                    "║ Customer ID: %-50s║\n" +
+                                                    "║                                                                ║\n" +
+                                                    "║ 📍 Giao dịch 1:                                                ║\n" +
+                                                    "║    Quốc gia: %-49s║\n" +
+                                                    "║    Thời gian: %-48s║\n" +
+                                                    "║    Sản phẩm: %-49s║\n" +
+                                                    "║    Số tiền: %-50.2f║\n" +
+                                                    "║                                                                ║\n" +
+                                                    "║ 📍 Giao dịch 2:                                                ║\n" +
+                                                    "║    Quốc gia: %-49s║\n" +
+                                                    "║    Thời gian: %-48s║\n" +
+                                                    "║    Sản phẩm: %-49s║\n" +
+                                                    "║    Số tiền: %-50.2f║\n" +
+                                                    "║                                                                ║\n" +
+                                                    "║ ⏱️  Khoảng cách thời gian: %d phút %d giây                     ║\n" +
+                                                    "╚════════════════════════════════════════════════════════════════╝\n",
+                                            current.getCustomerId(),
+                                            lastCountry,
+                                            last.getTransactionDate().toString(),
+                                            last.getProductName(),
+                                            last.getTotalAmount(),
+                                            currentCountry,
+                                            current.getTransactionDate().toString(),
+                                            current.getProductName(),
+                                            current.getTotalAmount(),
+                                            minutesDiff,
+                                            (timeDiff / 1000) % 60
+                                    );
+                                    System.err.println(alert);
+                                    out.collect(alert);
+                                }
+                            }
+                        }
+
+                        // Cập nhật giao dịch gần nhất
+                        lastTransactionState.update(current);
+
+                        // Debug log mỗi transaction
+                        System.out.println(String.format(
+                                "✅ Processed: Customer=%s, Country=%s, Time=%s, Product=%s",
+                                current.getCustomerId(),
+                                current.getCustomerCountry(),
+                                current.getTransactionDate(),
+                                current.getProductName()
+                        ));
+                    }
+                })
+                .name("Fraud Detection Process")
+                .print(); // In ra console
+
+
+        // Pipeline 2: Ghi dữ liệu thô vào Postgres (Giữ nguyên)
 
         JdbcExecutionOptions execOptions = new JdbcExecutionOptions.Builder()
                 .withBatchSize(1000)
@@ -244,6 +379,7 @@ public class DataStreamJob {
 
         env.enableCheckpointing(5000);
 
+
         transactionStream.sinkTo(
                 new Elasticsearch7SinkBuilder<Transaction>()
                         .setHosts(new HttpHost("localhost", 9200, "http"))
@@ -260,6 +396,7 @@ public class DataStreamJob {
                         })
                         .build()
         ).name("Elasticsearch Sink");
+
 
 
 		env.execute("Flink Ecommerce Real-Time Streaming");

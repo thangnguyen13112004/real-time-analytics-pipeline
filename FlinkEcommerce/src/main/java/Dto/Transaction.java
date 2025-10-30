@@ -15,6 +15,7 @@ public class Transaction {
     private String customerId;
     private Timestamp transactionDate;
     private String paymentMethod;
+    private String customerCountry;
 
     // Constructor mặc định (BẮT BUỘC cho Jackson)
     public Transaction() {}
@@ -64,5 +65,13 @@ public class Transaction {
                 ", productName='" + productName + '\'' +
                 ", totalAmount=" + totalAmount +
                 '}';
+    }
+
+    public String getCustomerCountry() {
+        return customerCountry;
+    }
+
+    public void setCustomerCountry(String customerCountry) {
+        this.customerCountry = customerCountry;
     }
 }

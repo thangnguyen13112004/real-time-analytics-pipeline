@@ -1,132 +1,466 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>Realtime Product Transactions</title>
-  <script>
-    const apiUrl = "http://localhost:5000/transaction";
-
-    // Hàm random dữ liệu theo kiểu generate_sales_transactions()
-    function generateSalesTransaction(productId, productName, productBrand) {
-      const categories = ['electronic', 'fashion', 'grocery', 'home', 'beauty', 'sports'];
-      const currencies = ['USD', 'GBP'];
-      const paymentMethods = ['credit_card', 'debit_card', 'online_transfer'];
-      const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-      const randomCurrency = currencies[Math.floor(Math.random() * currencies.length)];
-      const randomPayment = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
-      const price = (Math.random() * (1000 - 10) + 10).toFixed(2);
-      const quantity = Math.floor(Math.random() * 10) + 1;
-
-      const transaction = {
-        transactionId: crypto.randomUUID(),
-        productId,
-        productName,
-        productCategory: randomCategory,
-        productPrice: parseFloat(price),
-        productQuantity: quantity,
-        productBrand,
-        totalAmount: parseFloat(price) * quantity,
-        currency: randomCurrency,
-        customerId: "user_" + Math.floor(Math.random() * 10000),
-        transactionDate: new Date().toISOString(),
-        paymentMethod: randomPayment
-      };
-      return transaction;
-    }
-
-    // Gửi dữ liệu tới Flask API
-    async function sendTransaction(productId, productName, productBrand) {
-      const data = generateSalesTransaction(productId, productName, productBrand);
-
-      try {
-        const res = await fetch(apiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
-        if (res.ok) {
-          alert(`✅ Đã gửi giao dịch cho ${productName} (${productBrand})`);
-          console.log("Transaction:", data);
-        } else {
-          alert("❌ Gửi thất bại!");
-        }
-      } catch (err) {
-        console.error(err);
-        alert("❌ Không thể kết nối API!");
-      }
-    }
-
-    // Khi tải trang, hiển thị danh sách sản phẩm random
-    function renderProducts() {
-      const products = [
-        { id: 'product1', name: 'Laptop' },
-        { id: 'product2', name: 'Mobile' },
-        { id: 'product3', name: 'Tablet' },
-        { id: 'product4', name: 'Watch' },
-        { id: 'product5', name: 'Headphone' },
-        { id: 'product6', name: 'Speaker' }
-      ];
-      const brands = ['Apple', 'Samsung', 'OnePlus', 'Mi', 'Boat', 'Sony'];
-      const currencies = ['USD', 'GBP'];
-      const paymentMethods = ['credit_card', 'debit_card', 'online_transfer'];
-
-      const container = document.getElementById("product-list");
-      container.innerHTML = "";
-
-      products.forEach(p => {
-        const brand = brands[Math.floor(Math.random() * brands.length)];
-        const price = (Math.random() * (1000 - 10) + 10).toFixed(2);
-        const currency = currencies[Math.floor(Math.random() * currencies.length)];
-        const payment = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
-
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `
-          <h3>${p.name}</h3>
-          <p><strong>Hãng:</strong> ${brand}</p>
-          <p><strong>Giá:</strong> ${price} ${currency}</p>
-          <p><strong>Thanh toán:</strong> ${payment}</p>
-          <button onclick="sendTransaction('${p.id}', '${p.name}', '${brand}')">Mua ngay</button>
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    window.onload = renderProducts;
-  </script>
-
-  <style>
-    body { font-family: sans-serif; background: #f5f5f5; }
-    h1 { text-align: center; color: #0078d4; }
-    #product-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      padding: 20px;
-    }
-    .card {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      text-align: center;
-    }
-    button {
-      background: #0078d4;
-      color: white;
-      border: none;
-      padding: 8px 15px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #005fa3;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tech Store - Global Electronics</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-  <h1>🛍️ Hệ thống giao dịch thời gian thực</h1>
-  <div id="product-list"></div>
+    <header>
+        <div class="container">
+            <h1>🛒 Tech Store Global</h1>
+            <p>Fraud Detection Demo System</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Customer Selection Panel -->
+        <div class="customer-panel">
+            <h2>👤 Chọn Khách Hàng (Giả lập đăng nhập)</h2>
+            <div class="customer-selector">
+                <label for="customerSelect">Khách hàng hiện tại:</label>
+                <select id="customerSelect" onchange="updateCustomerInfo()">
+                    <option value="">-- Chọn khách hàng --</option>
+                </select>
+            </div>
+            <div class="customer-info" id="customerInfo">
+                <p>📍 <strong>Vị trí:</strong> <span id="customerLocation">Chưa chọn</span></p>
+                <p>🆔 <strong>Customer ID:</strong> <span id="customerIdDisplay">N/A</span></p>
+            </div>
+        </div>
+
+        <!-- Stats Panel -->
+        <div class="stats-panel">
+            <div class="stat-card">
+                <h3>Tổng giao dịch</h3>
+                <p id="totalTransactions">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Thành công</h3>
+                <p id="successTransactions" style="color: #28a745;">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Thất bại</h3>
+                <p id="failedTransactions" style="color: #dc3545;">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Doanh thu</h3>
+                <p id="totalRevenue">$0</p>
+            </div>
+        </div>
+
+        <!-- Products Grid -->
+        <div class="products-section">
+            <h2>🛍️ Sản Phẩm</h2>
+            <div class="products-grid" id="productsGrid"></div>
+        </div>
+
+        <!-- Transaction Log -->
+        <div class="transactions-section">
+            <h2>📊 Lịch Sử Giao Dịch</h2>
+            <div class="transaction-log" id="transactionLog"></div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Cấu hình API
+        const API_URL = 'http://localhost:5000';
+
+        // Dữ liệu sản phẩm chi tiết - mỗi thương hiệu là một sản phẩm
+        const products = [
+            // Laptops
+            { id: 'product1', name: 'Laptop', category: 'electronics', brand: 'Apple', priceRange: [800, 1000], currency: 'USD', paymentMethod: 'credit_card' },
+            { id: 'product2', name: 'Laptop', category: 'electronics', brand: 'Samsung', priceRange: [600, 900], currency: 'USD', paymentMethod: 'debit_card' },
+            { id: 'product3', name: 'Laptop', category: 'electronics', brand: 'Sony', priceRange: [700, 950], currency: 'GBP', paymentMethod: 'online_transfer' },
+            
+            // Mobiles
+            { id: 'product4', name: 'Mobile', category: 'electronics', brand: 'Apple', priceRange: [700, 1000], currency: 'USD', paymentMethod: 'credit_card' },
+            { id: 'product5', name: 'Mobile', category: 'electronics', brand: 'Samsung', priceRange: [400, 800], currency: 'GBP', paymentMethod: 'debit_card' },
+            { id: 'product6', name: 'Mobile', category: 'electronics', brand: 'OnePlus', priceRange: [300, 600], currency: 'USD', paymentMethod: 'online_transfer' },
+            { id: 'product7', name: 'Mobile', category: 'electronics', brand: 'Mi', priceRange: [200, 500], currency: 'USD', paymentMethod: 'debit_card' },
+            
+            // Tablets
+            { id: 'product8', name: 'Tablet', category: 'electronics', brand: 'Apple', priceRange: [500, 900], currency: 'USD', paymentMethod: 'credit_card' },
+            { id: 'product9', name: 'Tablet', category: 'electronics', brand: 'Samsung', priceRange: [300, 700], currency: 'GBP', paymentMethod: 'online_transfer' },
+            { id: 'product10', name: 'Tablet', category: 'electronics', brand: 'Mi', priceRange: [250, 500], currency: 'USD', paymentMethod: 'debit_card' },
+            
+            // Watches
+            { id: 'product11', name: 'Watch', category: 'fashion', brand: 'Apple', priceRange: [400, 800], currency: 'USD', paymentMethod: 'credit_card' },
+            { id: 'product12', name: 'Watch', category: 'fashion', brand: 'Samsung', priceRange: [200, 600], currency: 'GBP', paymentMethod: 'debit_card' },
+            { id: 'product13', name: 'Watch', category: 'fashion', brand: 'Mi', priceRange: [100, 400], currency: 'USD', paymentMethod: 'online_transfer' },
+            
+            // Headphones
+            { id: 'product14', name: 'Headphone', category: 'electronics', brand: 'Apple', priceRange: [200, 500], currency: 'USD', paymentMethod: 'credit_card' },
+            { id: 'product15', name: 'Headphone', category: 'electronics', brand: 'Sony', priceRange: [150, 450], currency: 'GBP', paymentMethod: 'debit_card' },
+            { id: 'product16', name: 'Headphone', category: 'electronics', brand: 'Boat', priceRange: [50, 300], currency: 'USD', paymentMethod: 'online_transfer' },
+            
+            // Speakers
+            { id: 'product17', name: 'Speaker', category: 'home', brand: 'Samsung', priceRange: [150, 600], currency: 'USD', paymentMethod: 'credit_card' },
+            { id: 'product18', name: 'Speaker', category: 'home', brand: 'Sony', priceRange: [120, 550], currency: 'GBP', paymentMethod: 'debit_card' },
+            { id: 'product19', name: 'Speaker', category: 'home', brand: 'Boat', priceRange: [80, 400], currency: 'USD', paymentMethod: 'online_transfer' },
+            
+            // Cameras
+            { id: 'product20', name: 'Camera', category: 'electronics', brand: 'Sony', priceRange: [500, 1200], currency: 'USD', paymentMethod: 'credit_card' },
+            { id: 'product21', name: 'Camera', category: 'electronics', brand: 'Samsung', priceRange: [400, 1000], currency: 'GBP', paymentMethod: 'debit_card' },
+            
+            // Clothing
+            { id: 'product22', name: 'T-Shirt', category: 'fashion', brand: 'Nike', priceRange: [20, 80], currency: 'USD', paymentMethod: 'credit_card' },
+            { id: 'product23', name: 'Jeans', category: 'fashion', brand: 'Levi\'s', priceRange: [50, 150], currency: 'USD', paymentMethod: 'debit_card' },
+            { id: 'product24', name: 'Sneakers', category: 'fashion', brand: 'Adidas', priceRange: [60, 200], currency: 'GBP', paymentMethod: 'online_transfer' },
+            
+            // Grocery
+            { id: 'product25', name: 'Coffee', category: 'grocery', brand: 'Starbucks', priceRange: [10, 50], currency: 'USD', paymentMethod: 'debit_card' },
+            { id: 'product26', name: 'Snacks Pack', category: 'grocery', brand: 'Lay\'s', priceRange: [5, 30], currency: 'USD', paymentMethod: 'online_transfer' },
+            
+            // Beauty
+            { id: 'product27', name: 'Perfume', category: 'beauty', brand: 'Dior', priceRange: [80, 300], currency: 'GBP', paymentMethod: 'credit_card' },
+            { id: 'product28', name: 'Lipstick', category: 'beauty', brand: 'MAC', priceRange: [20, 60], currency: 'USD', paymentMethod: 'debit_card' },
+            { id: 'product29', name: 'Face Cream', category: 'beauty', brand: 'L\'Oreal', priceRange: [15, 80], currency: 'USD', paymentMethod: 'online_transfer' },
+            
+            // Sports
+            { id: 'product30', name: 'Yoga Mat', category: 'sports', brand: 'Nike', priceRange: [20, 80], currency: 'USD', paymentMethod: 'debit_card' },
+            { id: 'product31', name: 'Dumbbells', category: 'sports', brand: 'Adidas', priceRange: [30, 150], currency: 'GBP', paymentMethod: 'credit_card' },
+            { id: 'product32', name: 'Running Shoes', category: 'sports', brand: 'Puma', priceRange: [50, 180], currency: 'USD', paymentMethod: 'online_transfer' }
+        ];
+
+        // Dữ liệu khách hàng theo quốc gia
+        const customersByCountry = {
+            'USA': {
+                customers: ['john_smith', 'sarah_johnson', 'michael_brown', 'emily_davis', 'david_wilson'],
+                flag: '🇺🇸',
+                location: 'United States'
+            },
+            'UK': {
+                customers: ['john_smith', 'olivia_anderson', 'william_thomas', 'sophie_jackson', 'harry_white'],
+                flag: '🇬🇧',
+                location: 'United Kingdom'
+            },
+            'Vietnam': {
+                customers: ['john_smith', 'tran_thi_b', 'le_van_c', 'pham_thi_d', 'hoang_van_e'],
+                flag: '🇻🇳',
+                location: 'Vietnam'
+            },
+            'Japan': {
+                customers: ['john_smith', 'sato_akira', 'suzuki_hana', 'yamamoto_kenji', 'watanabe_mei'],
+                flag: '🇯🇵',
+                location: 'Japan'
+            },
+            'Germany': {
+                customers: ['john_smith', 'schmidt_anna', 'weber_klaus', 'wagner_lisa', 'becker_tom'],
+                flag: '🇩🇪',
+                location: 'Germany'
+            },
+            'France': {
+                customers: ['john_smith', 'martin_marie', 'bernard_jean', 'petit_sophie', 'robert_luc'],
+                flag: '🇫🇷',
+                location: 'France'
+            },
+            'Australia': {
+                customers: ['john_smith', 'brown_emma', 'wilson_oliver', 'taylor_mia', 'anderson_noah'],
+                flag: '🇦🇺',
+                location: 'Australia'
+            },
+            'Canada': {
+                customers: ['john_smith', 'gagnon_marie', 'tremblay_luc', 'cote_emma', 'bouchard_alex'],
+                flag: '🇨🇦',
+                location: 'Canada'
+            }
+        };
+
+        let currentCustomer = null;
+        let currentCountry = null;
+        let transactions = [];
+        let totalRevenue = 0;
+        let successCount = 0;
+        let failedCount = 0;
+
+        // Khởi tạo customer selector
+        function initializeCustomerSelector() {
+            const select = document.getElementById('customerSelect');
+            
+            Object.keys(customersByCountry).forEach(country => {
+                const countryData = customersByCountry[country];
+                countryData.customers.forEach(customer => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify({ customer, country });
+                    option.textContent = `${countryData.flag} ${customer} (${country})`;
+                    select.appendChild(option);
+                });
+            });
+        }
+
+        function updateCustomerInfo() {
+            const select = document.getElementById('customerSelect');
+            if (select.value) {
+                const data = JSON.parse(select.value);
+                currentCustomer = data.customer;
+                currentCountry = data.country;
+                
+                const countryData = customersByCountry[currentCountry];
+                document.getElementById('customerLocation').textContent = 
+                    `${countryData.flag} ${countryData.location}`;
+                document.getElementById('customerIdDisplay').textContent = currentCustomer;
+            } else {
+                currentCustomer = null;
+                currentCountry = null;
+                document.getElementById('customerLocation').textContent = 'Chưa chọn';
+                document.getElementById('customerIdDisplay').textContent = 'N/A';
+            }
+        }
+
+        // Hàm utility
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function randomFloat(min, max, decimals = 2) {
+            return parseFloat((Math.random() * (max - min) + min).toFixed(decimals));
+        }
+
+        function randomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function getProductIcon(name) {
+            const icons = {
+                'Laptop': '💻',
+                'Mobile': '📱',
+                'Tablet': '📱',
+                'Watch': '⌚',
+                'Headphone': '🎧',
+                'Speaker': '🔊',
+                'Camera': '📷',
+                'T-Shirt': '👕',
+                'Jeans': '👖',
+                'Sneakers': '👟',
+                'Coffee': '☕',
+                'Snacks Pack': '🍿',
+                'Perfume': '💐',
+                'Lipstick': '💄',
+                'Face Cream': '🧴',
+                'Yoga Mat': '🧘',
+                'Dumbbells': '🏋️',
+                'Running Shoes': '👟'
+            };
+            return icons[name] || '📦';
+        }
+
+        function getCategoryIcon(category) {
+            const icons = {
+                'electronics': '⚡',
+                'fashion': '👗',
+                'home': '🏠',
+                'grocery': '🛒',
+                'beauty': '💅',
+                'sports': '⚽'
+            };
+            return icons[category] || '📦';
+        }
+
+        function formatPaymentMethod(method) {
+            const methods = {
+                'credit_card': 'Thẻ tín dụng',
+                'debit_card': 'Thẻ ghi nợ',
+                'online_transfer': 'Chuyển khoản'
+            };
+            return methods[method] || method;
+        }
+
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        // Hiển thị sản phẩm
+        function displayProducts() {
+            const grid = document.getElementById('productsGrid');
+            grid.innerHTML = products.map(product => {
+                const samplePrice = randomFloat(product.priceRange[0], product.priceRange[1]);
+                
+                return `
+                    <div class="product-card">
+                        <div class="product-icon">${getProductIcon(product.name)}</div>
+                        <h3>${product.name}</h3>
+                        <p class="brand"><strong>Hãng:</strong> ${product.brand}</p>
+                        <p class="price"><strong>Giá:</strong> ${samplePrice} ${product.currency}</p>
+                        <p class="category">${getCategoryIcon(product.category)} <strong>Danh mục:</strong> ${product.category}</p>
+                        <p class="payment"><strong>Thanh toán:</strong> ${formatPaymentMethod(product.paymentMethod)}</p>
+                        <p class="currency"><strong>Tiền tệ:</strong> ${product.currency}</p>
+                        <div class="product-location">
+                            <span class="location-icon">📍</span>
+                            <span id="product-location-${product.id}">Chọn khách hàng để xem vị trí</span>
+                        </div>
+                        <button class="buy-btn" onclick="purchaseProduct('${product.id}')">
+                            <span class="btn-icon">🛒</span> Mua ngay
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            
+            updateProductLocations();
+        }
+
+        function updateProductLocations() {
+            products.forEach(product => {
+                const locationEl = document.getElementById(`product-location-${product.id}`);
+                if (currentCustomer && currentCountry) {
+                    const countryData = customersByCountry[currentCountry];
+                    locationEl.textContent = `${countryData.flag} ${countryData.location}`;
+                    locationEl.style.color = '#28a745';
+                    locationEl.style.fontWeight = 'bold';
+                } else {
+                    locationEl.textContent = 'Chọn khách hàng để xem vị trí';
+                    locationEl.style.color = '#999';
+                    locationEl.style.fontWeight = 'normal';
+                }
+            });
+        }
+
+        // Tạo giao dịch
+        function generateTransaction(product) {
+            const price = randomFloat(product.priceRange[0], product.priceRange[1]);
+            const quantity = randomInt(1, 10);
+
+            const transaction = {
+                transactionId: generateUUID(),
+                productId: product.id,
+                productName: product.name,
+                productCategory: product.category,
+                productPrice: price,
+                productQuantity: quantity,
+                productBrand: product.brand,
+                currency: product.currency,
+                customerId: currentCustomer,
+                customerCountry: currentCountry,
+                transactionDate: new Date().toISOString(),
+                paymentMethod: product.paymentMethod,
+                totalAmount: parseFloat((price * quantity).toFixed(2))
+            };
+
+            return transaction;
+        }
+
+        // Xử lý mua hàng
+        async function purchaseProduct(productId) {
+            if (!currentCustomer) {
+                showToast('⚠️ Vui lòng chọn khách hàng trước khi mua hàng!', 'error');
+                return;
+            }
+
+            const product = products.find(p => p.id === productId);
+            const transaction = generateTransaction(product);
+            
+            // Hiển thị loading
+            showToast('⏳ Đang xử lý giao dịch...', 'info');
+            
+            try {
+                // Gửi tới Flask API
+                const response = await fetch(`${API_URL}/transaction`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(transaction)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
+                    // Thành công
+                    transactions.unshift(transaction);
+                    totalRevenue += transaction.totalAmount;
+                    successCount++;
+                    
+                    updateStats();
+                    addTransactionToLog(transaction, 'success');
+                    showToast('✅ Giao dịch thành công! Đã gửi lên Kafka', 'success');
+                } else {
+                    // Thất bại
+                    failedCount++;
+                    updateStats();
+                    addTransactionToLog(transaction, 'failed');
+                    showToast(`❌ Giao dịch thất bại: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                // Lỗi kết nối
+                failedCount++;
+                updateStats();
+                addTransactionToLog(transaction, 'failed');
+                showToast(`❌ Lỗi kết nối: ${error.message}`, 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('totalTransactions').textContent = successCount + failedCount;
+            document.getElementById('successTransactions').textContent = successCount;
+            document.getElementById('failedTransactions').textContent = failedCount;
+            document.getElementById('totalRevenue').textContent = `$${totalRevenue.toFixed(2)}`;
+        }
+
+        function addTransactionToLog(transaction, status) {
+            const log = document.getElementById('transactionLog');
+            const transactionElement = document.createElement('div');
+            transactionElement.className = `transaction-item ${status}`;
+            
+            const statusIcon = status === 'success' ? '✅' : '❌';
+            const statusText = status === 'success' ? 'Thành công' : 'Thất bại';
+            const countryData = customersByCountry[transaction.customerCountry];
+            
+            transactionElement.innerHTML = `
+                <div class="transaction-header">
+                    <span class="transaction-id">🔖 ${transaction.transactionId.substring(0, 8)}...</span>
+                    <span class="transaction-status ${status}">${statusIcon} ${statusText}</span>
+                    <span class="transaction-date">${new Date(transaction.transactionDate).toLocaleString('vi-VN')}</span>
+                </div>
+                <div class="transaction-details">
+                    <div class="detail-row">
+                        <span><strong>Sản phẩm:</strong> ${transaction.productName} (${transaction.productBrand})</span>
+                        <span><strong>Danh mục:</strong> ${getCategoryIcon(transaction.productCategory)} ${transaction.productCategory}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span><strong>Khách hàng:</strong> ${transaction.customerId}</span>
+                        <span><strong>Vị trí:</strong> ${countryData.flag} ${countryData.location}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span><strong>Số lượng:</strong> ${transaction.productQuantity}</span>
+                        <span><strong>Đơn giá:</strong> ${transaction.productPrice} ${transaction.currency}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span><strong>Thanh toán:</strong> ${formatPaymentMethod(transaction.paymentMethod)}</span>
+                        <span class="total-amount"><strong>Tổng tiền:</strong> ${transaction.totalAmount} ${transaction.currency}</span>
+                    </div>
+                </div>
+            `;
+            
+            log.insertBefore(transactionElement, log.firstChild);
+            
+            // Giới hạn 20 giao dịch hiển thị
+            while (log.children.length > 20) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        // Lắng nghe thay đổi customer để cập nhật vị trí trên sản phẩm
+        document.getElementById('customerSelect').addEventListener('change', updateProductLocations);
+
+        // Khởi tạo
+        initializeCustomerSelector();
+        displayProducts();
+    </script>
 </body>
 </html>
